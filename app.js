@@ -748,6 +748,7 @@ function setupBackup() {
       if (confirm("Are you absolutely sure?")) {
         localStorage.removeItem(STORAGE_MEMBERS);
         localStorage.removeItem(STORAGE_COLLECTIONS);
+        localStorage.removeItem(STORAGE_HISTORY);
         location.reload();
       }
     }
