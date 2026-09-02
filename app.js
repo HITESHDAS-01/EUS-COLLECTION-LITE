@@ -260,8 +260,10 @@ function setupBottomNav() {
       document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
       document.getElementById("page-" + page).classList.add("active");
 
+      if (page === "collect") renderCollectList(document.getElementById("searchInput").value);
       if (page === "summary") renderSummary();
       if (page === "members") renderMemberManage();
+      if (page === "history") renderHistoryList();
     });
   });
 }
