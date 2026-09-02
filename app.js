@@ -141,6 +141,60 @@ function togglePayment(memberId, month, year) {
   saveCollections(cols);
 }
 
+function removePayment(memberId, month, year) {
+  const key = collectionKey(month, year);
+  const cols = getCollections();
+  if (!cols[key]) return;
+  const idx = cols[key].indexOf(memberId);
+  if (idx >= 0) {
+    cols[key].splice(idx, 1);
+    saveCollections(cols);
+  }
+}
+
+// ===== HISTORY =====
+const STORAGE_HISTORY = "eus_history";
+
+function getHistory() {
+  try {
+    const data = localStorage.getItem(STORAGE_HISTORY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn("Corrupted history data:", e);
+  }
+  return [];
+}
+
+function saveHistory(history) {
+  localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+}
+
+function addToHistory(memberId, amount, month, year) {
+  const history = getHistory();
+  history.unshift({
+    memberId,
+    amount,
+    month: collectionKey(month, year),
+    date: new Date().toISOString()
+  });
+  saveHistory(history);
+}
+
+function deleteFromHistory(index) {
+  const history = getHistory();
+  if (index < 0 || index >= history.length) return;
+  const entry = history[index];
+  const [yearStr, monthStr] = entry.month.split("-");
+  const m = parseInt(monthStr, 10) - 1;
+  const y = parseInt(yearStr, 10);
+  removePayment(entry.memberId, m, y);
+  history.splice(index, 1);
+  saveHistory(history);
+}
+
 let collectMemberId = null;
 
 function openCollectSheet(memberId) {
@@ -166,7 +220,9 @@ function setupCollectSheet() {
   });
   document.getElementById("collectSave").addEventListener("click", () => {
     if (!collectMemberId) return;
+    const amt = parseInt(document.getElementById("collectAmount").value, 10) || 0;
     togglePayment(collectMemberId, currentMonth, currentYear);
+    addToHistory(collectMemberId, amt, currentMonth, currentYear);
     document.getElementById("collectSheet").classList.add("hidden");
     collectMemberId = null;
     toast("Payment collected!");
@@ -188,6 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupCollectPage();
   setupCollectSheet();
   setupSummaryPage();
+  setupHistoryPage();
   setupMembersPage();
   setupBackup();
   setupServiceWorker();
@@ -330,7 +387,14 @@ function renderCollectList(filter = "") {
     card.querySelector(".btn-collect").addEventListener("click", function () {
       const id = this.dataset.id;
       if (this.classList.contains("unpay")) {
-        togglePayment(id, currentMonth, currentYear);
+        removePayment(id, currentMonth, currentYear);
+        const history = getHistory();
+        const monthKey = collectionKey(currentMonth, currentYear);
+        const idx = history.findIndex(h => h.memberId === id && h.month === monthKey);
+        if (idx >= 0) {
+          history.splice(idx, 1);
+          saveHistory(history);
+        }
         renderCollectList(document.getElementById("searchInput").value);
       } else {
         openCollectSheet(id);
@@ -559,6 +623,56 @@ function renderMemberManage() {
       }
     });
 
+    list.appendChild(card);
+  });
+}
+
+// ===== HISTORY PAGE =====
+function setupHistoryPage() {
+  renderHistoryList();
+}
+
+function renderHistoryList() {
+  const history = getHistory();
+  const members = getMembers();
+  const list = document.getElementById("historyList");
+  const empty = document.getElementById("historyEmpty");
+  list.innerHTML = "";
+
+  if (history.length === 0) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  history.forEach((entry, idx) => {
+    const m = members.find(mem => mem.id === entry.memberId);
+    const name = m ? m.name : entry.memberId;
+    const initials = name.charAt(0);
+    const [y, mo] = entry.month.split("-");
+    const monthName = MONTHS[parseInt(mo, 10) - 1];
+    const date = new Date(entry.date);
+    const dateStr = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+    const card = document.createElement("div");
+    card.className = "member-card";
+    card.innerHTML = `
+      <div class="member-avatar paid">${escapeHtml(initials)}</div>
+      <div class="member-info">
+        <div class="member-name">${escapeHtml(name)}</div>
+        <div class="member-id">${monthName} ${y} &bull; ${dateStr}</div>
+        <div class="member-amount">₹${(entry.amount || 0).toLocaleString("en-IN")}</div>
+      </div>
+      <div class="member-actions">
+        <button class="btn-collect unpay" data-idx="${idx}">Undo</button>
+      </div>
+    `;
+    card.querySelector(".btn-collect").addEventListener("click", function () {
+      const i = parseInt(this.dataset.idx, 10);
+      deleteFromHistory(i);
+      toast("Collection undone");
+      renderHistoryList();
+    });
     list.appendChild(card);
   });
 }

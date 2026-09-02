@@ -435,6 +435,13 @@ html, body {
   opacity:0.7;
 }
 
+/* ===== HISTORY EMPTY ===== */
+.history-empty {
+  text-align:center; padding:60px 16px; color:var(--text-sub);
+}
+.history-empty svg { margin-bottom:12px; }
+.history-empty p { font-size:14px; font-weight:600; }
+
 /* ===== BOTTOM NAV ===== */
 .bottom-nav {
   position:fixed; bottom:0; left:0; right:0; background:white;
