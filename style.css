@@ -438,6 +438,14 @@ html, body {
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:#ccc; border-radius:3px; }
 
+/* Hide Netlify Badge */
+[data-netlify-badge], .netlify-badge, iframe[src*="netlify"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (min-width:600px) {
   .page { max-width:540px; margin:0 auto; }
