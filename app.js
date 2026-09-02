@@ -692,3 +692,30 @@ function setupServiceWorker() {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 }
+
+// ===== INSTALL PROMPT =====
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+installBtn.style.display = "none";
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "flex";
+});
+
+installBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === "accepted") {
+    toast("App installed!");
+  }
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+});
+
+window.addEventListener("appinstalled", () => {
+  installBtn.style.display = "none";
+  deferredPrompt = null;
+});

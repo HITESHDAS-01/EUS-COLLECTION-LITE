@@ -82,6 +82,29 @@ html, body {
   margin-top: 2px;
 }
 
+.install-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(232,181,71,0.4);
+  transition: all 0.2s;
+  animation: pulseGold 2s infinite;
+}
+
+.install-btn:active { transform: scale(0.9); }
+
+@keyframes pulseGold {
+  0%, 100% { box-shadow: 0 2px 8px rgba(232,181,71,0.4); }
+  50% { box-shadow: 0 2px 16px rgba(232,181,71,0.7); }
+}
+
 /* ===== PAGES ===== */
 .page { display:none; padding:0 0 88px 0; min-height:calc(100vh - 76px); }
 .page.active { display:block; }
