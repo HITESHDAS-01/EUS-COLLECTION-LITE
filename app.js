@@ -73,10 +73,14 @@ const STORAGE_MEMBERS = "eus_members";
 const STORAGE_COLLECTIONS = "eus_collections";
 
 function getMembers() {
-  const data = localStorage.getItem(STORAGE_MEMBERS);
-  if (data) {
-    const parsed = JSON.parse(data);
-    return sortMembers(parsed);
+  try {
+    const data = localStorage.getItem(STORAGE_MEMBERS);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) return sortMembers(parsed);
+    }
+  } catch (e) {
+    console.warn("Corrupted members data, resetting to defaults:", e);
   }
   localStorage.setItem(STORAGE_MEMBERS, JSON.stringify(DEFAULT_MEMBERS));
   return sortMembers([...DEFAULT_MEMBERS]);
@@ -86,13 +90,27 @@ function sortMembers(arr) {
   return [...arr].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function saveMembers(members) {
   localStorage.setItem(STORAGE_MEMBERS, JSON.stringify(members));
 }
 
 function getCollections() {
-  const data = localStorage.getItem(STORAGE_COLLECTIONS);
-  return data ? JSON.parse(data) : {};
+  try {
+    const data = localStorage.getItem(STORAGE_COLLECTIONS);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (typeof parsed === "object" && parsed !== null) return parsed;
+    }
+  } catch (e) {
+    console.warn("Corrupted collections data, resetting:", e);
+  }
+  return {};
 }
 
 function saveCollections(collections) {
@@ -129,6 +147,7 @@ let currentMonth = now.getMonth();
 let currentYear = now.getFullYear();
 let sumMonth = currentMonth;
 let sumYear = currentYear;
+let pickerTarget = "collect"; // "collect" or "summary"
 
 // ===== INIT =====
 document.addEventListener("DOMContentLoaded", () => {
@@ -190,17 +209,29 @@ function setupCollectPage() {
 
   // Picker toggle
   document.getElementById("monthChip").addEventListener("click", () => {
+    pickerTarget = "collect";
     pickerDialog.classList.remove("hidden");
   });
   document.getElementById("pickerCancel").addEventListener("click", () => {
     pickerDialog.classList.add("hidden");
   });
   document.getElementById("pickerOk").addEventListener("click", () => {
-    currentMonth = parseInt(monthSelect.value);
-    currentYear = parseInt(yearSelect.value);
-    monthLabel.textContent = getMonthLabel(currentMonth, currentYear);
-    pickerDialog.classList.add("hidden");
-    renderCollectList();
+    const ms = document.getElementById("monthSelect");
+    const ys = document.getElementById("yearSelect");
+    if (pickerTarget === "collect") {
+      currentMonth = parseInt(ms.value, 10);
+      currentYear = parseInt(ys.value, 10);
+      monthLabel.textContent = getMonthLabel(currentMonth, currentYear);
+      pickerDialog.classList.add("hidden");
+      renderCollectList();
+    } else {
+      sumMonth = parseInt(ms.value, 10);
+      sumYear = parseInt(ys.value, 10);
+      document.getElementById("monthLabelSum").textContent = getMonthLabel(sumMonth, sumYear);
+      document.getElementById("sumYearSelect").value = sumYear;
+      pickerDialog.classList.add("hidden");
+      renderSummary();
+    }
   });
 
   // Arrow nav
@@ -240,24 +271,24 @@ function renderCollectList(filter = "") {
 
   members.forEach(m => {
     const paid = isPaid(m.id, currentMonth, currentYear);
+    if (filter && !m.name.toLowerCase().includes(filterLower) && !m.id.toLowerCase().includes(filterLower)) return;
+
     if (paid) {
       collected++;
       collectedAmt += m.amount;
     }
 
-    if (filter && !m.name.toLowerCase().includes(filterLower) && !m.id.toLowerCase().includes(filterLower)) return;
-
     const card = document.createElement("div");
     card.className = "member-card";
     card.innerHTML = `
-      <div class="member-avatar ${paid ? 'paid' : ''}">${m.name.charAt(0)}</div>
+      <div class="member-avatar ${paid ? 'paid' : ''}">${escapeHtml(m.name.charAt(0))}</div>
       <div class="member-info">
-        <div class="member-name">${m.name}</div>
-        <div class="member-id">${m.id}</div>
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-id">${escapeHtml(m.id)}</div>
         <div class="member-amount">₹${m.amount.toLocaleString("en-IN")}/mo</div>
       </div>
       <div class="member-actions">
-        <button class="btn-collect ${paid ? 'unpay' : 'pay'}" data-id="${m.id}">
+        <button class="btn-collect ${paid ? 'unpay' : 'pay'}" data-id="${escapeHtml(m.id)}">
           ${paid ? 'Undo' : 'Collect'}
         </button>
       </div>
@@ -280,19 +311,8 @@ function setupSummaryPage() {
   const pickerDialog = document.getElementById("pickerDialog");
 
   document.getElementById("monthChipSum").addEventListener("click", () => {
-    // Reuse picker
-    const dialog = document.getElementById("pickerDialog");
-    dialog.classList.remove("hidden");
-    // Update OK button to target summary
-    document.getElementById("pickerOk").onclick = () => {
-      const ms = document.getElementById("monthSelect");
-      const ys = document.getElementById("yearSelect");
-      sumMonth = parseInt(ms.value);
-      sumYear = parseInt(ys.value);
-      monthLabel.textContent = getMonthLabel(sumMonth, sumYear);
-      dialog.classList.add("hidden");
-      renderSummary();
-    };
+    pickerTarget = "summary";
+    document.getElementById("pickerDialog").classList.remove("hidden");
   });
 
   monthLabel.textContent = getMonthLabel(sumMonth, sumYear);
@@ -308,7 +328,7 @@ function setupSummaryPage() {
   }
   sumYearSelect.value = sumYear;
   sumYearSelect.addEventListener("change", () => {
-    sumYear = parseInt(sumYearSelect.value);
+    sumYear = parseInt(sumYearSelect.value, 10);
     monthLabel.textContent = getMonthLabel(sumMonth, sumYear);
     renderSummary();
   });
@@ -408,7 +428,7 @@ function setupMembersPage() {
   document.getElementById("btnSaveModal").addEventListener("click", () => {
     const id = document.getElementById("mId").value.trim();
     const name = document.getElementById("mName").value.trim().toUpperCase();
-    const amount = parseInt(document.getElementById("mAmount").value);
+    const amount = parseInt(document.getElementById("mAmount").value, 10);
 
     if (!id || !name || !amount || amount <= 0) {
       showToast("Please fill all fields correctly");
@@ -462,14 +482,14 @@ function renderMemberManage() {
     const card = document.createElement("div");
     card.className = "manage-card";
     card.innerHTML = `
-      <div class="member-avatar">${m.name.charAt(0)}</div>
+      <div class="member-avatar">${escapeHtml(m.name.charAt(0))}</div>
       <div class="manage-info">
-        <div class="member-name">${m.name}</div>
-        <div class="member-id">${m.id} &bull; ₹${m.amount.toLocaleString("en-IN")}/mo</div>
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-id">${escapeHtml(m.id)} &bull; ₹${m.amount.toLocaleString("en-IN")}/mo</div>
       </div>
       <div class="manage-actions">
-        <button class="btn-icon btn-edit" data-id="${m.id}">Edit</button>
-        <button class="btn-icon btn-delete" data-id="${m.id}">Del</button>
+        <button class="btn-icon btn-edit" data-id="${escapeHtml(m.id)}">Edit</button>
+        <button class="btn-icon btn-delete" data-id="${escapeHtml(m.id)}">Del</button>
       </div>
     `;
 
@@ -591,7 +611,7 @@ function exportExcel() {
   const monthCols = new Set();
   allKeys.forEach(k => {
     const [y, m] = k.split("-");
-    monthCols.add(`${MONTHS[parseInt(m) - 1]} ${y}`);
+    monthCols.add(`${MONTHS[parseInt(m, 10) - 1]} ${y}`);
   });
 
   if (monthCols.size === 0) {
@@ -603,7 +623,7 @@ function exportExcel() {
     const [bm, by] = b.split(" ");
     const ai = MONTHS.indexOf(am);
     const bi = MONTHS.indexOf(bm);
-    return (parseInt(ay) - parseInt(by)) || (ai - bi);
+    return (parseInt(ay, 10) - parseInt(by, 10)) || (ai - bi);
   });
 
   sortedCols.forEach(mc => csv += "," + mc);
@@ -615,7 +635,7 @@ function exportExcel() {
     sortedCols.forEach(mc => {
       const [monthName, yearStr] = mc.split(" ");
       const mIdx = MONTHS.indexOf(monthName);
-      const y = parseInt(yearStr);
+      const y = parseInt(yearStr, 10);
       const key = collectionKey(mIdx, y);
       const paid = cols[key] && cols[key].includes(m.id);
       csv += "," + (paid ? m.amount : "");
@@ -628,7 +648,7 @@ function exportExcel() {
   sortedCols.forEach(mc => {
     const [monthName, yearStr] = mc.split(" ");
     const mIdx = MONTHS.indexOf(monthName);
-    const y = parseInt(yearStr);
+    const y = parseInt(yearStr, 10);
     const key = collectionKey(mIdx, y);
     const paidList = cols[key] || [];
     let monthTotal = 0;
