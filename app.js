@@ -141,6 +141,39 @@ function togglePayment(memberId, month, year) {
   saveCollections(cols);
 }
 
+let collectMemberId = null;
+
+function openCollectSheet(memberId) {
+  const members = getMembers();
+  const m = members.find(mem => mem.id === memberId);
+  if (!m) return;
+  collectMemberId = memberId;
+  document.getElementById("collectAvatar").textContent = m.name.charAt(0);
+  document.getElementById("collectName").textContent = m.name;
+  document.getElementById("collectId").textContent = m.id;
+  document.getElementById("collectAmount").value = m.amount;
+  document.getElementById("collectSheet").classList.remove("hidden");
+}
+
+function setupCollectSheet() {
+  document.getElementById("collectCancel").addEventListener("click", () => {
+    document.getElementById("collectSheet").classList.add("hidden");
+    collectMemberId = null;
+  });
+  document.getElementById("collectScrim").addEventListener("click", () => {
+    document.getElementById("collectSheet").classList.add("hidden");
+    collectMemberId = null;
+  });
+  document.getElementById("collectSave").addEventListener("click", () => {
+    if (!collectMemberId) return;
+    togglePayment(collectMemberId, currentMonth, currentYear);
+    document.getElementById("collectSheet").classList.add("hidden");
+    collectMemberId = null;
+    toast("Payment collected!");
+    renderCollectList(document.getElementById("searchInput").value);
+  });
+}
+
 // ===== STATE =====
 const now = new Date();
 let currentMonth = now.getMonth();
@@ -153,6 +186,7 @@ let pickerTarget = "collect"; // "collect" or "summary"
 document.addEventListener("DOMContentLoaded", () => {
   setupBottomNav();
   setupCollectPage();
+  setupCollectSheet();
   setupSummaryPage();
   setupMembersPage();
   setupBackup();
@@ -294,8 +328,13 @@ function renderCollectList(filter = "") {
       </div>
     `;
     card.querySelector(".btn-collect").addEventListener("click", function () {
-      togglePayment(this.dataset.id, currentMonth, currentYear);
-      renderCollectList(document.getElementById("searchInput").value);
+      const id = this.dataset.id;
+      if (this.classList.contains("unpay")) {
+        togglePayment(id, currentMonth, currentYear);
+        renderCollectList(document.getElementById("searchInput").value);
+      } else {
+        openCollectSheet(id);
+      }
     });
     list.appendChild(card);
   });
