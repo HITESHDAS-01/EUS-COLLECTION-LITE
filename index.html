@@ -182,30 +182,31 @@
         </div>
       </div>
     </div>
+  </main>
 
-    <div class="bottom-sheet hidden" id="collectSheet">
-      <div class="sheet-scrim" id="collectScrim"></div>
-      <div class="sheet-card">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">Collect Payment</div>
-        <div class="collect-member-info">
-          <div class="collect-avatar" id="collectAvatar">A</div>
-          <div>
-            <div class="collect-name" id="collectName">Member Name</div>
-            <div class="collect-id" id="collectId">EUS/XXX</div>
-          </div>
-        </div>
-        <div class="field">
-          <label>Amount (Rs.)</label>
-          <input type="number" id="collectAmount" placeholder="100" min="0" class="mat-input">
-        </div>
-        <div class="sheet-actions">
-          <button class="mat-btn text" id="collectCancel">Cancel</button>
-          <button class="mat-btn filled" id="collectSave">Save</button>
+  <!-- COLLECT SHEET (global) -->
+  <div class="bottom-sheet hidden" id="collectSheet">
+    <div class="sheet-scrim" id="collectScrim"></div>
+    <div class="sheet-card">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Collect Payment</div>
+      <div class="collect-member-info">
+        <div class="collect-avatar" id="collectAvatar">A</div>
+        <div>
+          <div class="collect-name" id="collectName">Member Name</div>
+          <div class="collect-id" id="collectId">EUS/XXX</div>
         </div>
       </div>
+      <div class="field">
+        <label>Amount (Rs.)</label>
+        <input type="number" id="collectAmount" placeholder="100" min="0" class="mat-input">
+      </div>
+      <div class="sheet-actions">
+        <button class="mat-btn text" id="collectCancel">Cancel</button>
+        <button class="mat-btn filled" id="collectSave">Save</button>
+      </div>
     </div>
-  </main>
+  </div>
 
   <!-- PAGE: BACKUP -->
   <main class="page" id="page-backup">
