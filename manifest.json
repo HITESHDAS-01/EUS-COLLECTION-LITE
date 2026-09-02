@@ -2,12 +2,23 @@
   "name": "EUS Collection Record",
   "short_name": "EUS Collection",
   "description": "Monthly Collection Record for Ekata Unnayan Sangstha",
+  "id": "/",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F4F6FB",
   "theme_color": "#0A2463",
   "categories": ["finance"],
   "orientation": "portrait-primary",
+  "screenshots": [
+    {
+      "src": "screenshot.png",
+      "sizes": "540x1200",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "EUS Collection Record App"
+    }
+  ],
   "icons": [
     {
       "src": "logo.png",
