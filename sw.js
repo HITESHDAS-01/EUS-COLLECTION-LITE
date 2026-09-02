@@ -1,4 +1,4 @@
-const CACHE_NAME = "eus-collection-v3";
+const CACHE_NAME = "eus-collection-v4";
 const ASSETS = [
   "./",
   "./index.html",
