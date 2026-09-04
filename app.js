@@ -152,6 +152,16 @@ function removePayment(memberId, month, year) {
   }
 }
 
+function getMonthInterest(month, year) {
+  const history = getHistory();
+  const key = collectionKey(month, year);
+  let total = 0;
+  history.forEach(h => {
+    if (h.month === key) total += (h.loanInterest || 0);
+  });
+  return total;
+}
+
 // ===== HISTORY =====
 const STORAGE_HISTORY = "eus_history";
 
@@ -172,11 +182,12 @@ function saveHistory(history) {
   localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
 }
 
-function addToHistory(memberId, amount, month, year) {
+function addToHistory(memberId, amount, loanInterest, month, year) {
   const history = getHistory();
   history.unshift({
     memberId,
     amount,
+    loanInterest: loanInterest || 0,
     month: collectionKey(month, year),
     date: new Date().toISOString()
   });
@@ -206,6 +217,8 @@ function openCollectSheet(memberId) {
   document.getElementById("collectName").textContent = m.name;
   document.getElementById("collectId").textContent = m.id;
   document.getElementById("collectAmount").value = m.amount;
+  document.getElementById("collectInterest").value = "";
+  document.getElementById("collectTotal").textContent = "₹" + m.amount.toLocaleString("en-IN");
   document.getElementById("collectSheet").classList.remove("hidden");
 }
 
@@ -218,11 +231,19 @@ function setupCollectSheet() {
     document.getElementById("collectSheet").classList.add("hidden");
     collectMemberId = null;
   });
+
+  document.getElementById("collectInterest").addEventListener("input", () => {
+    const amt = parseInt(document.getElementById("collectAmount").value, 10) || 0;
+    const interest = parseInt(document.getElementById("collectInterest").value, 10) || 0;
+    document.getElementById("collectTotal").textContent = "₹" + (amt + interest).toLocaleString("en-IN");
+  });
+
   document.getElementById("collectSave").addEventListener("click", () => {
     if (!collectMemberId) return;
     const amt = parseInt(document.getElementById("collectAmount").value, 10) || 0;
+    const interest = parseInt(document.getElementById("collectInterest").value, 10) || 0;
     togglePayment(collectMemberId, currentMonth, currentYear);
-    addToHistory(collectMemberId, amt, currentMonth, currentYear);
+    addToHistory(collectMemberId, amt, interest, currentMonth, currentYear);
     document.getElementById("collectSheet").classList.add("hidden");
     collectMemberId = null;
     toast("Payment collected!");
@@ -237,6 +258,7 @@ let currentYear = now.getFullYear();
 let sumMonth = currentMonth;
 let sumYear = currentYear;
 let pickerTarget = "collect"; // "collect" or "summary"
+let collectFilter = "all"; // "all", "paid", "pending"
 
 // ===== INIT =====
 document.addEventListener("DOMContentLoaded", () => {
@@ -350,6 +372,23 @@ function setupCollectPage() {
     renderCollectList(e.target.value);
   });
 
+  // Stat card filter clicks
+  document.querySelectorAll(".stat-card[data-filter]").forEach(card => {
+    card.addEventListener("click", () => {
+      const filterVal = card.dataset.filter;
+      if (collectFilter === filterVal) {
+        collectFilter = "all";
+      } else {
+        collectFilter = filterVal;
+      }
+      document.querySelectorAll(".stat-card[data-filter]").forEach(c => c.classList.remove("active-filter"));
+      if (collectFilter !== "all") {
+        card.classList.add("active-filter");
+      }
+      renderCollectList(document.getElementById("searchInput").value);
+    });
+  });
+
   renderCollectList();
 }
 
@@ -361,10 +400,14 @@ function renderCollectList(filter = "") {
   let collected = 0;
   let collectedAmt = 0;
   const filterLower = filter.toLowerCase();
+  const interest = getMonthInterest(currentMonth, currentYear);
 
   members.forEach(m => {
     const paid = isPaid(m.id, currentMonth, currentYear);
     if (filter && !m.name.toLowerCase().includes(filterLower) && !m.id.toLowerCase().includes(filterLower)) return;
+
+    if (collectFilter === "paid" && !paid) return;
+    if (collectFilter === "pending" && paid) return;
 
     if (paid) {
       collected++;
@@ -408,6 +451,7 @@ function renderCollectList(filter = "") {
   document.getElementById("statCollected").textContent = collected;
   document.getElementById("statPending").textContent = members.length - collected;
   document.getElementById("statTotal").textContent = "₹" + collectedAmt.toLocaleString("en-IN");
+  document.getElementById("statInterest").textContent = "₹" + interest.toLocaleString("en-IN");
 }
 
 // ===== SUMMARY PAGE =====
@@ -459,6 +503,7 @@ function renderSummary() {
   const key = collectionKey(sumMonth, sumYear);
   const cols = getCollections();
   const paidIds = cols[key] || [];
+  const interest = getMonthInterest(sumMonth, sumYear);
 
   let expected = 0, collected = 0;
   members.forEach(m => {
@@ -475,6 +520,7 @@ function renderSummary() {
   document.getElementById("sumPercent").textContent = pct + "%";
   document.getElementById("progressPct").textContent = pct + "%";
   document.getElementById("progressFill").style.width = pct + "%";
+  document.getElementById("sumInterest").textContent = "₹" + interest.toLocaleString("en-IN");
 
   // Year overview
   document.getElementById("sumYearSelect").value = sumYear;
@@ -487,6 +533,7 @@ function renderSummary() {
     members.forEach(mem => {
       if (monthPaidIds.includes(mem.id)) monthCollected += mem.amount;
     });
+    const monthInterest = getMonthInterest(i, sumYear);
     const mpct = expected ? Math.round((monthCollected / expected) * 100) : 0;
 
     const block = document.createElement("div");
@@ -494,6 +541,7 @@ function renderSummary() {
     block.innerHTML = `
       <div class="mb-name">${m}</div>
       <div class="mb-amount">₹${monthCollected.toLocaleString("en-IN")}</div>
+      ${monthInterest > 0 ? '<div class="mb-interest">+₹' + monthInterest.toLocaleString("en-IN") + ' int.</div>' : ''}
       <div class="mb-pct">${mpct}%</div>
     `;
     block.addEventListener("click", () => {
@@ -655,6 +703,8 @@ function renderHistoryList() {
     const monthName = MONTHS[parseInt(mo, 10) - 1];
     const date = new Date(entry.date);
     const dateStr = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    const interest = entry.loanInterest || 0;
+    const total = (entry.amount || 0) + interest;
 
     const card = document.createElement("div");
     card.className = "member-card";
@@ -663,7 +713,7 @@ function renderHistoryList() {
       <div class="member-info">
         <div class="member-name">${escapeHtml(name)}</div>
         <div class="member-id">${monthName} ${y} &bull; ${dateStr}</div>
-        <div class="member-amount">₹${(entry.amount || 0).toLocaleString("en-IN")}</div>
+        <div class="member-amount">₹${total.toLocaleString("en-IN")}${interest > 0 ? ' <span style="color:#AB47BC">(+₹' + interest.toLocaleString("en-IN") + ' int.)</span>' : ''}</div>
       </div>
       <div class="member-actions">
         <button class="btn-collect unpay" data-idx="${idx}">Undo</button>
@@ -686,6 +736,7 @@ function setupBackup() {
     const data = {
       members: getMembers(),
       collections: getCollections(),
+      history: getHistory(),
       exportDate: new Date().toISOString(),
       organization: "Ekata Unnayan Sangstha"
     };
@@ -724,6 +775,9 @@ function setupBackup() {
           if (confirm(`Import data from ${data.exportDate || 'unknown date'}?\nThis will REPLACE all current data.`)) {
             saveMembers(data.members);
             saveCollections(migrated);
+            if (data.history && Array.isArray(data.history)) {
+              saveHistory(data.history);
+            }
             renderCollectList();
             renderMemberManage();
             showToast("Data imported");
@@ -783,11 +837,14 @@ function exportExcel() {
   });
 
   sortedCols.forEach(mc => csv += "," + mc);
-  csv += ",Total Collected\n";
+  csv += ",Total Collected,Total Interest\n";
+
+  const history = getHistory();
 
   members.forEach((m, i) => {
     csv += `${i + 1},"${m.id}","${m.name}",${m.amount}`;
     let total = 0;
+    let memberInterest = 0;
     sortedCols.forEach(mc => {
       const [monthName, yearStr] = mc.split(" ");
       const mIdx = MONTHS.indexOf(monthName);
@@ -797,7 +854,10 @@ function exportExcel() {
       csv += "," + (paid ? m.amount : "");
       if (paid) total += m.amount;
     });
-    csv += "," + total + "\n";
+    history.forEach(h => {
+      if (h.memberId === m.id) memberInterest += (h.loanInterest || 0);
+    });
+    csv += "," + total + "," + memberInterest + "\n";
   });
 
   csv += ",,,TOTAL";
